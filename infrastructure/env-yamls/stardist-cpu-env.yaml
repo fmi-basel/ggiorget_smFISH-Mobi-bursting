@@ -1,4 +1,4 @@
-name: stardist
+name: stardist-cpu
 channels:
   - conda-forge
 dependencies:
@@ -29,6 +29,12 @@ dependencies:
   - opt-einsum=3.3.0
   - rsa=4.9
   - pre-commit
+  - questionary
+  - sphinx
+  - furo
+  - myst-parser
+  - sphinx-inline-tabs
+  - sphinx-copybutton
   - pip
   - pip:
       - tensorflow
