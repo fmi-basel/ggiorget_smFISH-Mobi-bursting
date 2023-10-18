@@ -1,3 +1,13 @@
+# Metadata
+* Channel order: w1/w2/w3
+* w1: 640 nm, spot channel 1
+* w2: 561 nm, spot channel 2
+* w3: 405 nm, DAPI stain for nuclei
+* Pixel size: 65 nm
+* Z-spacing: 300 nm
+
+---
+
 # Data
 Add a description of the data used in this project.
 

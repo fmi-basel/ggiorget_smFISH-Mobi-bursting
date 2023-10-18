@@ -8,7 +8,7 @@
 import os
 import sys
 
-project = "Smfish Mobi Bursting"
+project = "smFISH Mobi Bursting"
 copyright = (
     "2023, Friedrich Miescher Institute for Biomedical Research - Jana Tünnermann"
 )
@@ -43,7 +43,7 @@ myst_heading_anchors = 5
 
 html_theme = "furo"
 html_static_path = ["_static"]
-html_title = "Smfish Mobi Bursting"
+html_title = "smFISH Mobi Bursting"
 html_logo = "resources/logoipsum-258.svg"
 html_theme_options = {
     "light_css_variables": {
