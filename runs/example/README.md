@@ -18,4 +18,11 @@ The scripts write the config and log files into the current working directory. I
     `python ../../ipa/s01_segmentation/build_segmentation_config.py`
 2. Run preprocessing:<br>
     `python ../../ipa/s01_segmentation/run_segmentation.py`
+
+
+## s02_spot_detection
+1. Build spot detection config:<br>
+    `python ../../ipa/s02_spot_detection/build_spot_detection_config.py`
+2. Run spot detection:<br>
+    `python ../../ipa/s02_spot_detection/run_spot_detection.py`
 <!-- end instructions -->

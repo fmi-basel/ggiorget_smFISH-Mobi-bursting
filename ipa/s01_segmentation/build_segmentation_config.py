@@ -9,7 +9,7 @@ by the run_segmentation.py script.
 
 
 import os
-from os.path import join
+from os.path import join, dirname
 
 import questionary
 import yaml
@@ -45,7 +45,12 @@ def main() -> None:
     os.makedirs(output_dir, exist_ok=True)
 
     with open(os.path.join(cwd, CONFIG_NAME), "w") as f:
-        yaml.safe_dump(config, f)
+        yaml.safe_dump(config, f, sort_keys=False, indent=4)
+
+    _path_to_file = os.path.relpath(dirname(__file__), cwd)
+    next_cmd = f"python {_path_to_file}/run_segmentation.py"
+    print("Run the segmentation with: ")
+    print(next_cmd)
 
 
 if __name__ == "__main__":

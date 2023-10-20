@@ -14,13 +14,11 @@ from datetime import datetime
 import logging
 import os
 
-from csbdeep.models.pretrained import get_model_details, get_file
+
 from pathlib import Path
-from csbdeep.models import pretrained
 
 # Run on CPU
 from numpy._typing import ArrayLike
-from stardist.models import StarDist2D
 from tifffile import imread, imwrite
 from skimage.filters import gaussian
 from tqdm import tqdm
@@ -29,6 +27,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def get_patched_fun(cache_dir: str):
+    from csbdeep.models.pretrained import get_model_details, get_file
+
     def get_model_folder(cls, key_or_alias):
         key, alias, m = get_model_details(cls, key_or_alias)
         target = str(Path("models") / cls.__name__ / key)
@@ -106,7 +106,7 @@ def _merge_2d_to_3d(
 
             final_labeling[i + 1, current_plane == label_id] = new_label_id
 
-    return final_labeling
+    return final_labeling.astype(np.uint16)
 
 
 def _select_label_id(
@@ -166,6 +166,8 @@ def segment_cells(
 ):
     logger.info(f"Run segmentation on: " f"{w1_file.replace('_w1Conf640.stk', '')}")
 
+    from stardist.models import StarDist2D
+
     model = StarDist2D.from_pretrained(model_name)
 
     w1 = imread(w1_file)
@@ -185,7 +187,7 @@ def segment_cells(
     file_name = join(
         output_dir, basename(w1_file).replace("_w1Conf640.stk", "-CELL_SEG.tif")
     )
-    imwrite(file_name, data=final_labeling, compression="zlib")
+    imwrite(file_name, data=final_labeling, compression="zstd")
     logger.info(f"Saved cell segmentation to {file_name}.")
 
 
@@ -207,6 +209,8 @@ def main(
         Directory where the StarDist models are downloaded to.
 
     """
+    from csbdeep.models import pretrained
+
     pretrained.get_model_folder = get_patched_fun(cache_dir=model_cache_dir)
     logger = _create_logger(name="segmentation")
 
