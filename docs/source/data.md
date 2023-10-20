@@ -8,10 +8,6 @@
 
 ---
 
-# Data
-Add a description of the data used in this project.
-
-
 ## Bullet List
 - Bullet lists in Markdown are pretty straightforward.
 - A bunch of bullet points.

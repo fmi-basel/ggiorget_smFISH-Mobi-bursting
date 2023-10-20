@@ -10,9 +10,10 @@ import sys
 
 project = "smFISH Mobi Bursting"
 copyright = (
-    "2023, Friedrich Miescher Institute for Biomedical Research - Jana Tünnermann"
+    "2023, Friedrich Miescher Institute for Biomedical Research - Jana "
+    "Tünnermann, Tim-Oliver Buchholz"
 )
-author = "Jana Tünnermann"
+author = "Jana Tünnermann, Tim-Oliver Buchholz"
 release = "0.1"
 
 sys.path.insert(0, os.path.abspath("../../"))
