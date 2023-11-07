@@ -22,18 +22,19 @@ def main() -> None:
     cwd = os.getcwd()
 
     input_dir = questionary.path("Path to input directory:").ask()
+    output_dir = questionary.path("Path to output directory:").ask()
     segmentation_dir = questionary.path(
-        "Path to segmentation directory:", default=join(input_dir, "s01_segmentation")
+        "Path to segmentation directory:", default=join(output_dir, "s01_segmentation")
     ).ask()
     spot_dir = questionary.path(
-        "Path to spot directory:", default=join(input_dir, "s02_spot-detection")
+        "Path to spot directory:", default=join(output_dir, "s02_spot-detection")
     ).ask()
     cutoff_dist = int(
         questionary.text(
             "cutoff distance for coloc.:", default="3", validate=lambda v: v.isdigit()
         ).ask()
     )
-    output_dir = join(input_dir, "s03_postprocessing")
+    output_dir = join(output_dir, "s03_postprocessing")
 
     config = {
         "input_dir": os.path.relpath(input_dir, cwd),
