@@ -34,6 +34,19 @@ def main() -> None:
             "cutoff distance for coloc.:", default="3", validate=lambda v: v.isdigit()
         ).ask()
     )
+    spot_radius = tuple(
+        int(s)
+        for s in questionary.text(
+            "radius of spot mask [Z, YX]:",
+            default="2, 3",
+            validate=lambda v: v.replace(",", "")
+            .replace(".", "")
+            .replace(" ", "")
+            .isdigit(),
+        )
+        .ask()
+        .split(",")
+    )
     output_dir = join(output_dir, "s03_postprocessing")
 
     config = {
@@ -41,6 +54,7 @@ def main() -> None:
         "segmentation_dir": os.path.relpath(segmentation_dir, cwd),
         "spot_dir": os.path.relpath(spot_dir, cwd),
         "cutoff_dist": cutoff_dist,
+        "spot_radius": spot_radius,
         "output_dir": os.path.relpath(output_dir, cwd),
     }
 
