@@ -9,3 +9,6 @@ We use [StarDist](https://github.com/stardist/stardist) to segment the cells.
 
 ## s02_spot_detection
 We use a combination of Laplacian of Gaussian (LoG) and h-maxima for spot detection. The LoG selects all spots which are of the right size and h-maxima filters the regions which have the right intensity. The detected spots must be detected with both of these methods.
+
+## s03_postprocessing
+We perform two post-processing steps. First, spots are assigned to cell labels and second spots from both channels are co-localized.

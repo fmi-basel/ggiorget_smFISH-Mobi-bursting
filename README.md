@@ -1,21 +1,19 @@
 <!-- start abstract -->
-# Smfish Mobi Bursting
-![](https://picsum.photos/id/223/800/600)
+# smFISH from 'Using Live-cell Imaging to investigate Enhancer-driven Transcriptional Dynamics'
 
-Test
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod
-tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At
-vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren,
-no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet,
-consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et
-dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo
-duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est
-Lorem ipsum dolor sit amet.
+![](/docs/source/resources/FISH.jpg)
+
+This repository contains all code used to analyse smFISH data from the project 'Using Live-cell Imaging to investigate Enhancer-driven Transcriptional Dynamics'. 
+
+Central steps involve:
+1. cell segmentation
+2. spot detection
+3. post-processing: assigning spots to cells, and check co-localisation
 <!-- end abstract -->
 
 ## Repository Overview
 * `docs`: Contains all project documentation.
-* `infrastructure`: Contains detailed installation instructions for all requried tools.
+* `infrastructure`: Contains detailed installation instructions for all required tools.
 * `ipa`: Contains all image-processing-and-analysis (ipa) scripts which are used for this project to generate final results.
 * `runs`: Contains all config files which were used as inputs to the scripts in `ipa`.
 * `scratchpad`: Contains everything that is nice to keep track of, but which is not used for any final results.
