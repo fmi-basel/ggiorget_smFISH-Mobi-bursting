@@ -5,22 +5,21 @@ run_segmentation.py
 This script expects segmentation_config.yaml to be present in the current
 working directory.
 """
+import logging
+import os
+from datetime import datetime
 from glob import glob
 from os.path import join, basename
+from pathlib import Path
 
 import numpy as np
 import yaml
-from datetime import datetime
-import logging
-import os
-
-
-from pathlib import Path
-
+from csbdeep.utils import normalize
 # Run on CPU
 from numpy._typing import ArrayLike
+from skimage.morphology import remove_small_objects
+from skimage.segmentation import clear_border
 from tifffile import imread, imwrite
-from skimage.filters import gaussian
 from tqdm import tqdm
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -82,12 +81,12 @@ def _normalize(img: ArrayLike) -> ArrayLike:
 
 
 def _merge_2d_to_3d(
-    raw_data: ArrayLike, plane_segmentations: list[ArrayLike]
+        raw_data: ArrayLike, plane_segmentations: list[ArrayLike]
 ) -> ArrayLike:
     final_labeling = np.zeros_like(raw_data)
     final_labeling[0] = plane_segmentations[0]
     for i, current_plane in tqdm(
-        enumerate(plane_segmentations[1:]), total=len(plane_segmentations) - 1
+            enumerate(plane_segmentations[1:]), total=len(plane_segmentations) - 1
     ):
         previous_plane = final_labeling[i]
         for label_id in filter(None, np.unique(current_plane)):
@@ -110,7 +109,7 @@ def _merge_2d_to_3d(
 
 
 def _select_label_id(
-    candidate_labels, counts, previous_plane, roi_in_current_plane, current_max_label
+        candidate_labels, counts, previous_plane, roi_in_current_plane, current_max_label
 ):
     if len(candidate_labels) == 0:
         # Nothing in the previous plane
@@ -161,8 +160,29 @@ def _get_candidate_labels(previous_plane, roi_in_current_plane):
     return candidate_labels, counts
 
 
+def remove_yxborder_cells(labeling: ArrayLike) -> ArrayLike:
+    """
+    Remove cells which touch the border in the xy plane.
+
+    Parameters
+    ----------
+    labeling
+        label image of shape (z, y, x)
+
+    Returns
+    -------
+    cleared_labeling
+        label image of shape (z, y, x)
+    """
+    mask = np.zeros_like(labeling)
+    mask[:, 1:-1, 1:-1] = 1
+    cleared_labeling = clear_border(labeling, mask=mask.astype(bool))
+
+    return cleared_labeling
+
+
 def segment_cells(
-    w1_file: str, w2_file: str, model_name: str, output_dir: str, logger: logging.Logger
+        w1_file: str, w2_file: str, model_name: str, output_dir: str, logger: logging.Logger
 ):
     logger.info(f"Run segmentation on: " f"{w1_file.replace('_w1Conf640.stk', '')}")
 
@@ -172,17 +192,21 @@ def segment_cells(
 
     w1 = imread(w1_file)
     w2 = imread(w2_file)
-    raw_data = _normalize((w1 + w2) // 2)
-    raw_data = gaussian(raw_data, 2)
+
+    raw_data = normalize(((w1 + w2) // 2), axis=(1, 2))
 
     plane_segmentations = []
     for plane in raw_data:
-        labels, _ = model.predict_instances(plane, scale=0.33)
+        labels, _ = model.predict_instances(plane, scale=0.33, prob_thresh=0.6)
+        labels = remove_small_objects(labels, min_size=2000)
         plane_segmentations.append(labels)
 
     final_labeling = _merge_2d_to_3d(
         raw_data=raw_data, plane_segmentations=plane_segmentations
     )
+
+    # remove border touching cells in xy
+    final_labeling = remove_yxborder_cells(final_labeling)
 
     file_name = join(
         output_dir, basename(w1_file).replace("_w1Conf640.stk", "-CELL_SEG.tif")
@@ -192,7 +216,7 @@ def segment_cells(
 
 
 def main(
-    input_dir: str, output_dir: str, model_name: str, model_cache_dir: str
+        input_dir: str, output_dir: str, model_name: str, model_cache_dir: str
 ) -> None:
     """
     Perform segmentation on all data in the input directory.
