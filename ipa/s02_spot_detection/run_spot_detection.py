@@ -161,7 +161,10 @@ def detect_spots(
 
         spots.extend(detections.tolist())
 
-    return pd.DataFrame(spots, columns=["axis-0", "axis-1", "axis-2"])
+    # duplicates can occur if cells are too close/crops overlap. Simply remove them
+    spots = pd.DataFrame(spots, columns=["axis-0", "axis-1", "axis-2"]).drop_duplicates().reset_index(drop=True)
+
+    return spots
 
 
 def get_log_detections(roi_img, yx_sigma, z_sigma):
