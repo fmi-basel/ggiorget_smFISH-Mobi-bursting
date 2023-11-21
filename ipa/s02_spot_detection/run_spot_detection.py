@@ -22,7 +22,8 @@ import yaml
 import pandas as pd
 import numpy as np
 
-from skimage.util import img_as_float32
+from scipy.ndimage import median_filter
+from skimage.util import img_as_float32, img_as_uint
 from tqdm import tqdm
 
 
@@ -138,6 +139,7 @@ def detect_spots(
     pd.DataFrame with detected spots
     """
     image = imread(img_path)
+    image = hot_px_filter(image)
     segmentation = imread(cell_seg_path).astype(np.uint16)
     yx_sigma = get_yx_sigma(wavelength, NA, spacing[1])
     z_sigma = get_z_sigma(wavelength, NA, spacing[0])
@@ -214,6 +216,33 @@ def list_cell_seg_files(input_dir: str, raw_files: list[str]) -> list[str]:
         cell_seg_files.append(cell_seg_file)
 
     return cell_seg_files
+
+
+def hot_px_filter(image: np.ndarray) -> np.ndarray:
+    """
+    Filter hot pixels in the image using a median filter.
+
+    Parameters
+    ----------
+    image :
+        Image to be filtered.
+
+    Returns
+    -------
+    Filtered image.
+    """
+    image = img_as_float32(image)
+    med = median_filter(image, size=2, axes=(1, 2))
+    # create mask for hot pixels
+    hotpixel = abs(image - med)
+    hotpixel_mask = np.zeros(hotpixel.shape)
+    hotpixel_mask[hotpixel > np.mean(hotpixel) + 15 * np.std(hotpixel)] = 1
+    # create image as replace hot pixel with values from median filtered image
+    img_filt = image.copy()
+    img_filt[hotpixel_mask == 1] = med[hotpixel_mask == 1]
+    img_filt = img_as_uint(img_filt)
+
+    return img_filt
 
 
 def main(

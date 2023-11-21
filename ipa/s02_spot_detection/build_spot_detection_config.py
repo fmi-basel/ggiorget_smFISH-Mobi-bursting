@@ -56,7 +56,7 @@ def main() -> None:
     )
     h_1 = int(
         questionary.text(
-            "Threshold Channel 1:", default="600", validate=lambda v: v.isdigit()
+            "Threshold Channel 1:", default="400", validate=lambda v: v.isdigit()
         ).ask()
     )
     h_2 = int(
