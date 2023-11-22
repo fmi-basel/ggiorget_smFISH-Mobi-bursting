@@ -179,7 +179,7 @@ def assign_spots(spot_coord_path: str, cell_seg_path: str) -> pd.DataFrame:
     return spot_coord
 
 
-def create_3d_disk_mask(z:int, y:int, x:int, radius_xy:int, radius_z:int, shape:tuple) -> np.array:
+def create_3d_disk_mask(z: int, y: int, x: int, radius_xy: int, radius_z: int, shape: tuple) -> np.array:
     """
     Create a 3d disk mask with given radi and center coordinates
 
@@ -295,7 +295,6 @@ def linear_sum_colocalisation(spot_coord_1: pd.DataFrame, spot_coord_2: pd.DataF
     match_spot_coord_2 = spot_coord_2.rename(
         columns={'z': 'z_w2', 'y': 'y_w2', 'x': 'x_w2', 'spot_mean': 'spot_mean_w2', 'spot_sd': 'spot_sd_w2'})
 
-
     match_df = pd.merge(match_index_df, match_spot_coord_1, left_on='index_1', right_index=True, how='left')
     match_df = pd.merge(match_df, match_spot_coord_2, left_on='index_2', right_index=True, how='left')
     match_df.drop(columns=['index_1', 'index_2'], inplace=True)
@@ -372,21 +371,22 @@ def main(
             z_radius=spot_radius[0]
         )
 
-        # readout DAPI intensity
-        df_dapi = readout_dapi(
-            img_path=w3_file,
-            cell_seg_path=cell_seg_file,
-        )
-
-        df_spots_w1 = pd.merge(df_spots_w1, df_dapi, on='label', how='left')
-        df_spots_w2 = pd.merge(df_spots_w2, df_dapi, on='label', how='left')
-
         # check for presence of spot in both channels
         df_spots_w1, df_spots_w2, df_matched_spots = linear_sum_colocalisation(
             spot_coord_1=df_spots_w1.copy(),
             spot_coord_2=df_spots_w2.copy(),
             cutoff_dist=cutoff_dist,
         )
+
+        # readout DAPI intensity
+        df_dapi = readout_dapi(
+            img_path=w3_file,
+            cell_seg_path=cell_seg_file,
+        )
+
+        df_spots_w1 = pd.merge(df_spots_w1, df_dapi, on='label', how='outer')
+        df_spots_w2 = pd.merge(df_spots_w2, df_dapi, on='label', how='outer')
+        df_matched_spots = pd.merge(df_matched_spots, df_dapi, on='label', how='outer')
 
         # save spot information
         df_spots_w1.to_csv(
