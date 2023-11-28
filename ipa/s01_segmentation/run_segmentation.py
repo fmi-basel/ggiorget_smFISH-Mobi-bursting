@@ -19,6 +19,7 @@ from csbdeep.utils import normalize
 from numpy._typing import ArrayLike
 from skimage.morphology import remove_small_objects
 from skimage.segmentation import clear_border
+from skimage.measure import regionprops
 from tifffile import imread, imwrite
 from tqdm import tqdm
 
@@ -181,6 +182,26 @@ def remove_yxborder_cells(labeling: ArrayLike) -> ArrayLike:
     return cleared_labeling
 
 
+def get_bbox_shape(bbox: ArrayLike) -> ArrayLike:
+    """
+    get shape of bbox object
+
+    Parameters
+    ----------
+    bbox
+        bbox coordinates of shape (z, y, x)
+
+    Returns
+    -------
+    shape
+        shape of bbox
+    """
+    min_coords = bbox[:len(bbox) // 2]
+    max_coords = bbox[len(bbox) // 2:]
+    shape = [max_coord - min_coord for min_coord, max_coord in zip(min_coords, max_coords)]
+    return shape
+
+
 def segment_cells(
         w1_file: str, w2_file: str, model_name: str, output_dir: str, logger: logging.Logger
 ):
@@ -207,6 +228,12 @@ def segment_cells(
 
     # remove border touching cells in xy
     final_labeling = remove_yxborder_cells(final_labeling)
+
+    # remove cells which are present in less than 3 planes
+    for cell in regionprops(final_labeling):
+        shape = get_bbox_shape(cell.bbox)
+        if shape[0] < 10:
+            final_labeling[final_labeling == cell.label] = 0
 
     file_name = join(
         output_dir, basename(w1_file).replace("_w1Conf640.stk", "-CELL_SEG.tif")
