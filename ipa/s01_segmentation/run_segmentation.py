@@ -19,7 +19,6 @@ from csbdeep.utils import normalize
 from numpy._typing import ArrayLike
 from skimage.morphology import remove_small_objects
 from skimage.segmentation import clear_border
-from skimage.measure import regionprops
 from tifffile import imread, imwrite
 from tqdm import tqdm
 
@@ -74,11 +73,6 @@ def list_files(input_dir: str) -> tuple[list[str], list[str]]:
     w1_files = glob(join(input_dir, "*_w1Conf640.stk"))
     w2_files = [w1.replace("w1Conf640", "w2Conf561") for w1 in w1_files]
     return w1_files, w2_files
-
-
-def _normalize(img: ArrayLike) -> ArrayLike:
-    mi, ma = np.quantile(img[np.argmax(np.mean(img, axis=(1, 2)))], [0.5, 1])
-    return np.clip((img - mi) / (ma - mi), 0, 10)
 
 
 def _merge_2d_to_3d(
@@ -182,26 +176,6 @@ def remove_yxborder_cells(labeling: ArrayLike) -> ArrayLike:
     return cleared_labeling
 
 
-def get_bbox_shape(bbox: ArrayLike) -> ArrayLike:
-    """
-    get shape of bbox object
-
-    Parameters
-    ----------
-    bbox
-        bbox coordinates of shape (z, y, x)
-
-    Returns
-    -------
-    shape
-        shape of bbox
-    """
-    min_coords = bbox[:len(bbox) // 2]
-    max_coords = bbox[len(bbox) // 2:]
-    shape = [max_coord - min_coord for min_coord, max_coord in zip(min_coords, max_coords)]
-    return shape
-
-
 def segment_cells(
         w1_file: str, w2_file: str, model_name: str, output_dir: str, logger: logging.Logger
 ):
@@ -214,12 +188,11 @@ def segment_cells(
     w1 = imread(w1_file)
     w2 = imread(w2_file)
 
-    raw_data = normalize(((w1 + w2) // 2), axis=(1, 2))
+    raw_data = normalize(((w1 + w2) // 2))
 
     plane_segmentations = []
     for plane in raw_data:
-        labels, _ = model.predict_instances(plane, scale=0.33, prob_thresh=0.6)
-        labels = remove_small_objects(labels, min_size=2000)
+        labels, _ = model.predict_instances(plane, scale=0.33, prob_thresh=0.7)
         plane_segmentations.append(labels)
 
     final_labeling = _merge_2d_to_3d(
@@ -229,11 +202,8 @@ def segment_cells(
     # remove border touching cells in xy
     final_labeling = remove_yxborder_cells(final_labeling)
 
-    # remove cells which are present in less than 3 planes
-    for cell in regionprops(final_labeling):
-        shape = get_bbox_shape(cell.bbox)
-        if shape[0] < 10:
-            final_labeling[final_labeling == cell.label] = 0
+    # remove small cells, size of 90000 corresponds to an elipsoid of 3x3x3 um
+    final_labeling = remove_small_objects(final_labeling, min_size=90000)
 
     file_name = join(
         output_dir, basename(w1_file).replace("_w1Conf640.stk", "-CELL_SEG.tif")
