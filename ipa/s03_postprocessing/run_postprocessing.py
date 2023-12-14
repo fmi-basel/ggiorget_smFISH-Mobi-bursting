@@ -18,8 +18,8 @@ import yaml
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from skimage import measure
-from skimage.draw import disk
 from tifffile import imread
+from tqdm import tqdm
 
 sys.path.insert(1, join(dirname(__file__), "..", ".."))
 
@@ -110,7 +110,7 @@ def list_spot_files(input_dir: str, raw_files: list[str]) -> list[str]:
 
 def readout_dapi(img_path: str, cell_seg_path: str) -> pd.DataFrame:
     """
-    Load DAPI files with matching cell segmentation.
+    Read-out DAPI intensity
 
     Parameters
     ----------
@@ -128,19 +128,47 @@ def readout_dapi(img_path: str, cell_seg_path: str) -> pd.DataFrame:
     w3 = imread(img_path)
     segmentation = imread(cell_seg_path)
 
-    def mean(regionmask, intensity):
-        return np.mean(intensity[regionmask])
-
     def sd(regionmask, intensity):
         return np.std(intensity[regionmask])
 
     def sumup(regionmask, intensity):
         return np.sum(intensity[regionmask])
 
-    df = pd.DataFrame(measure.regionprops_table(segmentation, w3, properties=('label', 'area',),
-                                                extra_properties=(mean, sd, sumup,)))
-    df.rename(columns={'area': 'cellarea', 'mean': 'dapi_mean', 'sd': 'dapi_sd', 'sumup': 'dapi_integratedintensity'},
+    df = pd.DataFrame(measure.regionprops_table(segmentation, w3, properties=('label', 'area', 'intensity_mean',),
+                                                extra_properties=(sd, sumup,)))
+    df.rename(columns={'area': 'cellarea', 'intensity_mean': 'dapi_mean', 'sd': 'dapi_sd',
+                       'sumup': 'dapi_integratedintensity'},
               inplace=True)
+
+    return df
+
+
+def readout_background_intensity(img_path: str, cell_seg_path: str) -> pd.DataFrame:
+    """
+    Read-out cell background intensity
+
+    Parameters
+    ----------
+    img_path :
+        Directory containing the intensity images
+
+    cell_seg_path :
+        Directory containing the corresponding segmentation files
+
+    Returns
+    -------
+    dataframe with intensity readout
+    """
+
+    image = imread(img_path)
+    segmentation = imread(cell_seg_path)
+
+    def median(regionmask, intensity):
+        return np.median(intensity[regionmask])
+
+    df = pd.DataFrame(measure.regionprops_table(segmentation, image, properties=('label',),
+                                                extra_properties=(median,)))
+    df.rename(columns={'median': 'background_median'}, inplace=True)
 
     return df
 
@@ -179,37 +207,37 @@ def assign_spots(spot_coord_path: str, cell_seg_path: str) -> pd.DataFrame:
     return spot_coord
 
 
-def create_3d_disk_mask(z: int, y: int, x: int, radius_xy: int, radius_z: int, shape: tuple) -> np.array:
+def create_3d_ellipsoid_mask(radius_xy: int, radius_z: int) -> np.array:
     """
-    Create a 3d disk mask with given radi and center coordinates
+    Create a 3d ellipsoid mask with given radi (no empty slices)
 
     Parameters
     ----------
-    z :
-        z coordinate of the center
-    y :
-        y coordinate of the center
-    x :
-        x coordinate of the center
     radius_xy :
         radius in xy plane
     radius_z :
         radius in z plane
-    shape :
-        shape of the mask
 
     Returns
     -------
-    3d disk mask
+    3d ellipsoid mask
     """
-    mask = np.zeros(shape, dtype=bool)
-    for iz in range(max(0, z - radius_z), min(shape[0], z + radius_z + 1)):
-        rr, cc = disk((y, x), radius_xy, shape=(shape[1], shape[2]))
-        mask[iz, rr, cc] = 1
-    return mask
+    from skimage.draw import ellipsoid
+
+    # create ellipsoid
+    ellipse = ellipsoid(radius_z, radius_xy, radius_xy)
+    # remove empty slices
+    mask_z = np.any(ellipse, axis=(1, 2))
+    mask_y = np.any(ellipse, axis=(0, 2))
+    mask_x = np.any(ellipse, axis=(0, 1))
+    ellipse = ellipse[mask_z, :, :]
+    ellipse = ellipse[:, mask_y, :]
+    ellipse = ellipse[:, :, mask_x]
+
+    return ellipse
 
 
-def int_readout(image_path: str, spot_coord: pd.DataFrame, yx_radius: int, z_radius: int) -> pd.DataFrame:
+def intensity_readout_spot(image_path: str, spot_coord: pd.DataFrame, yx_radius: int, z_radius: int) -> pd.DataFrame:
     """
     Readout intensity of spots in a given image
 
@@ -231,20 +259,39 @@ def int_readout(image_path: str, spot_coord: pd.DataFrame, yx_radius: int, z_rad
     # read in image and pad to avoid boundary effects
     image = imread(image_path)
     image = np.pad(image, ((z_radius, z_radius), (yx_radius, yx_radius), (yx_radius, yx_radius)), 'edge')
+    # create spot mask
+    ellipse_mask = create_3d_ellipsoid_mask(yx_radius, z_radius)
 
-    # readout intensity spot by spot using a disk shaped mask
+    def sd(regionmask, intensity):
+        return np.std(intensity[regionmask])
+
+    def sumup(regionmask, intensity):
+        return np.sum(intensity[regionmask])
+
+    def median(regionmask, intensity):
+        return np.median(intensity[regionmask])
+
+    # readout intensity spot by spot using mask
     int_spots = []
-    for spot in spot_coord.index:
-        y = spot_coord.loc[spot, 'y'] + yx_radius
-        x = spot_coord.loc[spot, 'x'] + yx_radius
-        z = spot_coord.loc[spot, 'z'] + z_radius
-        spot_mask = create_3d_disk_mask(z, y, x, radius_xy=yx_radius, radius_z=z_radius, shape=image.shape)
-        mean_int = np.mean(image[spot_mask])
-        sd_int = np.std(image[spot_mask])
-        int_spots.append([spot, mean_int, sd_int])
+    y_coords = spot_coord['y'].values + yx_radius
+    x_coords = spot_coord['x'].values + yx_radius
+    z_coords = spot_coord['z'].values + z_radius
 
-    int_spots = pd.DataFrame(int_spots, columns=['index', 'spot_mean', 'spot_sd']).set_index('index')
+    for z, y, x in zip(z_coords, y_coords, x_coords):
+        image_cut = image[z - z_radius:z + z_radius + 1, y - yx_radius:y + yx_radius + 1,
+                    x - yx_radius:x + yx_radius + 1]
+        df = pd.DataFrame(measure.regionprops_table(ellipse_mask.astype(np.uint8), image_cut,
+                                                    properties=('intensity_mean', 'intensity_max',),
+                                                    extra_properties=(sd, sumup, median,)))
+        int_spots.append(df)
+
+    int_spots = pd.concat(int_spots).reset_index(drop=True)
+    int_spots.rename(
+        columns={'intensity_mean': 'spot_mean', 'intensity_max': 'spot_max', 'sd': 'spot_sd',
+                 'sumup': 'spot_integratedintensity', 'median': 'spot_median'},
+        inplace=True)
     spot_coord = pd.concat([spot_coord, int_spots], axis=1)
+
     return spot_coord
 
 
@@ -269,8 +316,8 @@ def linear_sum_colocalisation(spot_coord_1: pd.DataFrame, spot_coord_2: pd.DataF
     -------
     input dataframes with additional column indicating co-localisation and one additional dataframe with matched spots
     """
-    spot_coord_1_values = spot_coord_1[['z', 'y', 'x']].values
-    spot_coord_2_values = spot_coord_2[['z', 'y', 'x']].values
+    spot_coord_1_values = spot_coord_1[['z', 'y', 'x']].dropna().values
+    spot_coord_2_values = spot_coord_2[['z', 'y', 'x']].dropna().values
 
     # calculate the distance matrix and find the optimal assignment
     global_distances = cdist(spot_coord_1_values, spot_coord_2_values, 'euclidean')
@@ -283,21 +330,19 @@ def linear_sum_colocalisation(spot_coord_1: pd.DataFrame, spot_coord_2: pd.DataF
     spot_coord_1_ind = spot_coord_1_ind[distance_id < cutoff_dist]
     spot_coord_2_ind = spot_coord_2_ind[distance_id < cutoff_dist]
 
+    # create a dataframe only containing the matches spots, where one row corresponds to a match
+    match_index_df = pd.DataFrame({'index_w1': spot_coord_1_ind, 'index_w2': spot_coord_2_ind})
+    match_spot_coord_1 = spot_coord_1.add_suffix('_w1')
+    match_spot_coord_2 = spot_coord_2.add_suffix('_w2')
+
+    match_df = pd.merge(match_index_df, match_spot_coord_1, left_on='index_w1', right_index=True, how='left')
+    match_df = pd.merge(match_df, match_spot_coord_2, left_on='index_w2', right_index=True, how='left')
+    match_df.drop(columns=['index_w1', 'index_w2', 'label_w2'], inplace=True)
+    match_df.rename(columns={'label_w1': 'label'}, inplace=True)
+
     # add column to indicate co-localisation
     spot_coord_1['coloc'] = spot_coord_1.index.isin(spot_coord_1_ind)
     spot_coord_2['coloc'] = spot_coord_2.index.isin(spot_coord_2_ind)
-
-    # create a dataframe only containing the matches spots, where one row corresponds to a match
-    match_index_df = pd.DataFrame({'index_1': spot_coord_1_ind, 'index_2': spot_coord_2_ind})
-    match_spot_coord_1 = spot_coord_1.rename(
-        columns={'z': 'z_w1', 'y': 'y_w1', 'x': 'x_w1', 'spot_mean': 'spot_mean_w1', 'spot_sd': 'spot_sd_w1'})
-    match_spot_coord_1 = match_spot_coord_1.loc[:, match_spot_coord_1.columns.str.contains("_w1")]
-    match_spot_coord_2 = spot_coord_2.rename(
-        columns={'z': 'z_w2', 'y': 'y_w2', 'x': 'x_w2', 'spot_mean': 'spot_mean_w2', 'spot_sd': 'spot_sd_w2'})
-
-    match_df = pd.merge(match_index_df, match_spot_coord_1, left_on='index_1', right_index=True, how='left')
-    match_df = pd.merge(match_df, match_spot_coord_2, left_on='index_2', right_index=True, how='left')
-    match_df.drop(columns=['index_1', 'index_2'], inplace=True)
 
     return spot_coord_1, spot_coord_2, match_df
 
@@ -340,9 +385,9 @@ def main(
     w1_spot_files = list_spot_files(input_dir=spot_dir, raw_files=w1_files)
     w2_spot_files = list_spot_files(input_dir=spot_dir, raw_files=w2_files)
 
-    for w1_file, w2_file, w3_file, cell_seg_file, w1_spot_file, w2_spot_file in zip(w1_files, w2_files, w3_files,
-                                                                                    cell_seg_files, w1_spot_files,
-                                                                                    w2_spot_files):
+    for w1_file, w2_file, w3_file, cell_seg_file, w1_spot_file, w2_spot_file in tqdm(zip(w1_files, w2_files, w3_files,
+                                                                                         cell_seg_files, w1_spot_files,
+                                                                                         w2_spot_files)):
         logger.info(f"Processing {basename(w3_file)}.")
 
         # assign spots to cells, remove spots that are not assigned
@@ -357,24 +402,38 @@ def main(
         )
 
         # readout spot intensity
-        df_spots_w1 = int_readout(
+        df_spots_w1 = intensity_readout_spot(
             image_path=w1_file,
             spot_coord=df_spots_w1,
             yx_radius=spot_radius[1],
             z_radius=spot_radius[0]
         )
 
-        df_spots_w2 = int_readout(
+        df_spots_w2 = intensity_readout_spot(
             image_path=w2_file,
             spot_coord=df_spots_w2,
             yx_radius=spot_radius[1],
             z_radius=spot_radius[0]
         )
 
+        # read-out background intensity
+        df_background_w1 = readout_background_intensity(
+            img_path=w1_file,
+            cell_seg_path=cell_seg_file,
+        )
+
+        df_background_w2 = readout_background_intensity(
+            img_path=w2_file,
+            cell_seg_path=cell_seg_file,
+        )
+
+        df_spots_w1 = pd.merge(df_spots_w1, df_background_w1, on='label', how='outer')
+        df_spots_w2 = pd.merge(df_spots_w2, df_background_w2, on='label', how='outer')
+
         # check for presence of spot in both channels
         df_spots_w1, df_spots_w2, df_matched_spots = linear_sum_colocalisation(
-            spot_coord_1=df_spots_w1.copy(),
-            spot_coord_2=df_spots_w2.copy(),
+            spot_coord_1=df_spots_w1,
+            spot_coord_2=df_spots_w2,
             cutoff_dist=cutoff_dist,
         )
 

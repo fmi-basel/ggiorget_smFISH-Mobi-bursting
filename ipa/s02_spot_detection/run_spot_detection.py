@@ -6,25 +6,25 @@ Run_spot_detection.py
 This script expects spot_detection_config.yaml to be present in the
 current working directory.
 """
+import logging
 import sys
+from datetime import datetime
 from os.path import basename, join, exists, dirname
 
-sys.path.insert(1, join(dirname(__file__), "..", ".."))
+import numpy as np
+import pandas as pd
+import yaml
+from scipy.ndimage import gaussian_laplace
+from scipy.ndimage import median_filter
+from skimage.measure import regionprops
+from skimage.morphology import h_maxima, local_maxima
+from skimage.util import img_as_float32, img_as_uint
+from tifffile import imread
+from tqdm import tqdm
 
 from ipa.s01_segmentation.run_segmentation import list_files
-from tifffile import imread
-from skimage.morphology import h_maxima, local_maxima
-from skimage.measure import regionprops
-from scipy.ndimage import gaussian_laplace
-import logging
-from datetime import datetime
-import yaml
-import pandas as pd
-import numpy as np
 
-from scipy.ndimage import median_filter
-from skimage.util import img_as_float32, img_as_uint
-from tqdm import tqdm
+sys.path.insert(1, join(dirname(__file__), "..", ".."))
 
 
 def _create_logger(name: str) -> logging.Logger:
@@ -62,7 +62,7 @@ def get_yx_sigma(wavelength: float, NA: float, yx_spacing: float):
         Emission wavelength
     NA :
         Numerical Aperture
-    z_spacing :
+    yx_spacing :
         Spacing of z planes
 
     Returns
@@ -92,7 +92,7 @@ def get_z_sigma(wavelength: float, NA: float, z_spacing: float):
     -------
     theoretical sigma
     """
-    return 2 * wavelength / (NA**2) / (2 * np.sqrt(2 * np.log(2))) / z_spacing
+    return 2 * wavelength / (NA ** 2) / (2 * np.sqrt(2 * np.log(2))) / z_spacing
 
 
 def _bbox_to_slices(bbox, padding, shape):
@@ -103,12 +103,12 @@ def _bbox_to_slices(bbox, padding, shape):
 
 
 def detect_spots(
-    img_path: str,
-    cell_seg_path: str,
-    wavelength: int,
-    NA: float,
-    spacing: tuple[float, float, float],
-    intensity_threshold: int,
+        img_path: str,
+        cell_seg_path: str,
+        wavelength: int,
+        NA: float,
+        spacing: tuple[float, float, float],
+        intensity_threshold: int,
 ) -> pd.DataFrame:
     """
     Detect bright, diffraction limited spots.
@@ -246,15 +246,15 @@ def hot_px_filter(image: np.ndarray) -> np.ndarray:
 
 
 def main(
-    input_dir: str,
-    segmentation_dir: str,
-    output_dir: str,
-    wavelength_1: int,
-    wavelength_2: int,
-    NA: float,
-    spacing: tuple[float, float, float],
-    h_1: int,
-    h_2: int,
+        input_dir: str,
+        segmentation_dir: str,
+        output_dir: str,
+        wavelength_1: int,
+        wavelength_2: int,
+        NA: float,
+        spacing: tuple[float, float, float],
+        h_1: int,
+        h_2: int,
 ) -> None:
     """
     Apply feature_extraction step to data in input_dir.
