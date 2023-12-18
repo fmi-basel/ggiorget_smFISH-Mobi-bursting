@@ -285,7 +285,13 @@ def intensity_readout_spot(image_path: str, spot_coord: pd.DataFrame, yx_radius:
                                                     extra_properties=(sd, sumup, median,)))
         int_spots.append(df)
 
-    int_spots = pd.concat(int_spots).reset_index(drop=True)
+    # check if spots were found. If not return empty dataframe
+    try:
+        int_spots = pd.concat(int_spots).reset_index(drop=True)
+    except ValueError:
+        print(f'no spots in cells in {basename(image_path)}')
+        int_spots = pd.DataFrame(columns=['intensity_mean', 'intensity_max', 'sd', 'sumup', 'median'])
+
     int_spots.rename(
         columns={'intensity_mean': 'spot_mean', 'intensity_max': 'spot_max', 'sd': 'spot_sd',
                  'sumup': 'spot_integratedintensity', 'median': 'spot_median'},
