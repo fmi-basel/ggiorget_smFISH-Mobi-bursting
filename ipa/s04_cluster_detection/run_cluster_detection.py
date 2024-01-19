@@ -266,7 +266,7 @@ def main(
 
             # save cluster information
             df_cluster.to_csv(
-                join(output_dir, basename(w1_spot_file).replace("_w1Conf640.csv", "_clusters.csv")),
+                join(output_dir, basename(w1_spot_file).replace("_postprocessed.csv", "_clusters.csv")),
                 index_label=True,
             )
         else:
