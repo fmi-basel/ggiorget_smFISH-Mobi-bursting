@@ -179,7 +179,7 @@ def cluster_detection(image_path: str, segmentation_path: str, spot_coord: pd.Da
         spots=spots_coord,
         voxel_size=spacing,
         spot_radius=spot_radius_nm,  # radius in nm comes from reighleight criterion
-        alpha=0.3,  # relates to the intensity of the average spot. 0.5 means median intensity
+        alpha=0.5,  # relates to the intensity of the average spot. 0.5 means median intensity
     )
 
     # run cluster detection
@@ -187,7 +187,7 @@ def cluster_detection(image_path: str, segmentation_path: str, spot_coord: pd.Da
         spots=spots_post_decomposition,
         voxel_size=spacing,
         radius=int(spacing[0]),
-        nb_min_spots=5)
+        nb_min_spots=4)
 
     # create dataframe with cluster information
     df_cluster = pd.DataFrame(clusters, columns=['z', 'y', 'x', 'nb_spots', 'index'])
