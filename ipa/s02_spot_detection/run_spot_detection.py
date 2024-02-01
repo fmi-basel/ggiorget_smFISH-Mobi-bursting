@@ -11,6 +11,8 @@ import sys
 from datetime import datetime
 from os.path import basename, join, exists, dirname
 
+sys.path.insert(1, join(dirname(__file__), "..", ".."))
+
 import numpy as np
 import pandas as pd
 import yaml
@@ -24,7 +26,6 @@ from tqdm import tqdm
 
 from ipa.s01_segmentation.run_segmentation import list_files
 
-sys.path.insert(1, join(dirname(__file__), "..", ".."))
 
 
 def _create_logger(name: str) -> logging.Logger:
