@@ -325,6 +325,22 @@ def linear_sum_colocalisation(spot_coord_1: pd.DataFrame, spot_coord_2: pd.DataF
     spot_coord_1_values = spot_coord_1[['z', 'y', 'x']].dropna().values
     spot_coord_2_values = spot_coord_2[['z', 'y', 'x']].dropna().values
 
+    # check if one of the channels is empty, if yes return empty dataframe
+    if (spot_coord_1_values.size == 0) is not  (spot_coord_2_values.size == 0):
+        # create empty dataframe with same column names as non-empty one (see below)
+        match_spot_coord_1 = spot_coord_1.add_suffix('_w1')
+        match_spot_coord_2 = spot_coord_2.add_suffix('_w2')
+        match_spot_coord_1.rename(columns={'label_w1': 'label'}, inplace=True)
+        match_spot_coord_2.rename(columns={'label_w2': 'label'}, inplace=True)
+        match_df = match_spot_coord_1.merge(match_spot_coord_2, on='label')
+        match_df = match_df[0:0]
+        # add column to indicate co-localisation
+        spot_coord_1['coloc'] = False
+        spot_coord_2['coloc'] = False
+
+        print(f'no spots in one of the channels')
+        return spot_coord_1, spot_coord_2, match_df
+
     # calculate the distance matrix and find the optimal assignment
     global_distances = cdist(spot_coord_1_values, spot_coord_2_values, 'euclidean')
     spot_coord_1_ind, spot_coord_2_ind = linear_sum_assignment(global_distances)
