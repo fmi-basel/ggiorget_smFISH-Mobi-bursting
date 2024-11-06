@@ -1,9 +1,9 @@
 <!-- start abstract -->
-# smFISH from 'Using Live-cell Imaging to investigate Enhancer-driven Transcriptional Dynamics'
+# smRNA-FISH analysis from 'Enhancer control of transcriptional activity via modulation of burst frequency'
 
 ![](/docs/source/resources/FISH.jpg)
 
-This repository contains all code used to analyse smFISH data from the project 'Using Live-cell Imaging to investigate Enhancer-driven Transcriptional Dynamics'. 
+This repository contains all code used to analyse smRNA-FISH data from the project 'Enhancer control of transcriptional activity via modulation of burst frequency'. 
 
 Central steps involve:
 1. cell segmentation
@@ -23,6 +23,3 @@ Detailed install instructions can be found in [infrastructure/README.md](infrast
 
 ## Citation
 Do not forget to cite our [publication]() if you use any of our provided materials.
-
----
-This project was generated with the [faim-ipa-project](https://fmi-faim.github.io/ipa-project-template/) copier template.
